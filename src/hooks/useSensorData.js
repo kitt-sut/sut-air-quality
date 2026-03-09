@@ -3,15 +3,7 @@ import { LOCATIONS, FETCH_INTERVAL_MS } from '../config';
 import { fetchPM25 } from '../services/sheetService';
 
 /**
- * Fetches PM2.5 readings for all configured locations.
- *
- * Returns:
- *   sensorData    – { [sensorId]: number }
- *   errorSensors  – { [sensorId]: boolean }  true when that sensor failed
- *   lastUpdate    – Thai locale date/time string
- *   loading       – true during the first fetch
- *   fetchError    – true when ALL sensors failed simultaneously
- *   refresh       – call manually to force a re-fetch
+ * Custom Hook สำหรับดึงข้อมูล PM2.5 ของทุกสถานที่
  */
 const useSensorData = () => {
   const [sensorData, setSensorData]     = useState({});
@@ -28,17 +20,32 @@ const useSensorData = () => {
     const newErrors   = {};
     let anySuccess    = false;
 
-    for (const loc of LOCATIONS) {
-      if (!loc.gid) continue;
+    // สร้างอาร์เรย์ของ Promise สำหรับดึงข้อมูลพร้อมกัน (Parallel Fetching)
+    const fetchPromises = LOCATIONS.map(async (loc) => {
+      if (!loc.gid) return null;
       try {
         const pm25 = await fetchPM25(loc.gid, loc.sensorId);
-        newReadings[loc.sensorId] = pm25;
-        anySuccess = true;
+        return { sensorId: loc.sensorId, pm25, error: false };
       } catch (err) {
         console.error(`[${loc.sensorId}]`, err.message);
-        newErrors[loc.sensorId] = true;
+        return { sensorId: loc.sensorId, pm25: null, error: true };
       }
-    }
+    });
+
+    // รอให้ทุก Promise ทำงานเสร็จสิ้น ไม่ว่าจะสำเร็จหรือล้มเหลว
+    const results = await Promise.all(fetchPromises);
+
+    // จัดการข้อมูลที่ได้กลับมา
+    results.forEach((result) => {
+      if (result) {
+        if (result.error) {
+          newErrors[result.sensorId] = true;
+        } else {
+          newReadings[result.sensorId] = result.pm25;
+          anySuccess = true;
+        }
+      }
+    });
 
     setSensorData((prev) => ({ ...prev, ...newReadings }));
     setErrorSensors(newErrors);

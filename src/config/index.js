@@ -1,4 +1,4 @@
-export const SHEET_ID = '170K_lkALbT1XbzxC2i7OVwmlOK1b-kEueRVj7YZ2s_E';
+export const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 
 export const LOCATIONS = [
   {
