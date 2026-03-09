@@ -1,0 +1,64 @@
+# ชื่อของ Action นี้
+name: Deploy static content to Pages
+
+# กำหนดให้ทำงานอัตโนมัติเมื่อมีการ Push โค้ดเข้า branch ที่ชื่อว่า 'main'
+on:
+  push:
+    branches: ['main']
+
+# กำหนดสิทธิ์ให้ Action นี้สามารถอ่านโค้ดและเขียนข้อมูลลง Pages ได้
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ป้องกันไม่ให้รันงานซ้ำซ้อนกัน ถ้ารันใหม่อันเก่าจะถูกยกเลิก
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  # งานสำหรับการ Build และ Deploy
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. ดึงโค้ดล่าสุดจาก Repository
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. ติดตั้ง Node.js
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 3. ติดตั้ง Dependencies ทั้งหมด (เหมือนการพิมพ์ npm install)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. แปลงโค้ด React เป็นไฟล์สำหรับใช้งานจริง
+      # ตรงนี้เราดึงตัวแปร VITE_GOOGLE_SHEET_ID จากที่ตั้งค่าไว้ใน GitHub มาใส่ตอน Build
+      - name: Build
+        env:
+          VITE_GOOGLE_SHEET_ID: ${{ vars.VITE_GOOGLE_SHEET_ID }}
+        run: npm run build
+
+      # 5. เตรียมการอัปโหลดไฟล์
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      # 6. อัปโหลดโฟลเดอร์ dist ที่ได้จากการ Build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      # 7. นำไฟล์ขึ้นแสดงผลบน GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
