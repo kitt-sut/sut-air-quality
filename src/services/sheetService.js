@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { SHEET_ID } from '../config';
+import { SHEET_ID, PM25_COL_INDEX } from '../config';
 
 /**
  * Fetch the latest PM2.5 reading from a specific Google Sheet tab (by gid).
@@ -32,8 +32,9 @@ export const fetchPM25 = async (gid, sensorId, signal) => {
   const tail = rows.slice(-10).reverse();
 
   for (const cols of tail) {
-    if (cols.length > 4) {
-      const pm25 = parseFloat(cols[4]);
+    // ใช้ตัวแปร PM25_COL_INDEX
+    if (cols.length > PM25_COL_INDEX) {
+      const pm25 = parseFloat(cols[PM25_COL_INDEX]);
       if (!isNaN(pm25)) return pm25;
     }
   }

@@ -1,5 +1,8 @@
 export const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 
+// ค่าคงที่สำหรับเก็บตำแหน่งของคอลัมน์ PM2.5 (คอลัมน์ E = ลำดับที่ 4)
+export const PM25_COL_INDEX = 4;
+
 export const LOCATIONS = [
   {
     id: 1,
