@@ -1,27 +1,5 @@
+import Papa from 'papaparse';
 import { SHEET_ID } from '../config';
-
-/**
- * Parse a single CSV row, correctly handling quoted fields that contain commas.
- * e.g.  `"Mar 5, 2026",ESP32_01,room,25.3` → ['Mar 5, 2026', 'ESP32_01', 'room', '25.3']
- */
-const parseCSVRow = (row) => {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (const ch of row) {
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  result.push(current.trim());
-  return result;
-};
 
 /**
  * Fetch the latest PM2.5 reading from a specific Google Sheet tab (by gid).
@@ -39,14 +17,19 @@ export const fetchPM25 = async (gid, sensorId) => {
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${sensorId}`);
 
   const csvText = await response.text();
-  const rows = csvText.split('\n');
 
-  // Only scan the last 10 rows (bottom-up) for efficiency
+  // 1. ใช้ PapaParse จัดการข้อความ CSV ทั้งก้อน
+  const parsedData = Papa.parse(csvText, {
+    skipEmptyLines: true, // ให้ข้ามบรรทัดที่ว่างเปล่าไปเลย
+  });
+
+  // 2. ข้อมูลที่ได้จะเป็น Array ของ Array (ตาราง)
+  const rows = parsedData.data;
+
+  // 3. นำ 10 แถวสุดท้ายมาตรวจสอบ (คล้ายโลจิกเดิมที่คุณทำไว้)
   const tail = rows.slice(-10).reverse();
 
-  for (const rawRow of tail) {
-    if (!rawRow.trim()) continue;
-    const cols = parseCSVRow(rawRow);
+  for (const cols of tail) {
     if (cols.length > 4) {
       const pm25 = parseFloat(cols[4]);
       if (!isNaN(pm25)) return pm25;
