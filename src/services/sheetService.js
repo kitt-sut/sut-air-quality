@@ -7,13 +7,15 @@ import { SHEET_ID } from '../config';
  *
  * @param {string} gid   - Sheet tab GID
  * @param {string} sensorId - Used for error logging only
+ * @param {AbortSignal} signal - Used to cancel data retrieval
  * @returns {Promise<number>} PM2.5 value
  * @throws {Error} if no valid data is found or the request fails
  */
-export const fetchPM25 = async (gid, sensorId) => {
+export const fetchPM25 = async (gid, sensorId, signal) => {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
 
-  const response = await fetch(url);
+  // ส่ง signal เข้าไปใน fetch
+  const response = await fetch(url, { signal });
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${sensorId}`);
 
   const csvText = await response.text();

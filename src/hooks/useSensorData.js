@@ -1,10 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { LOCATIONS, FETCH_INTERVAL_MS } from '../config';
 import { fetchPM25 } from '../services/sheetService';
 
-/**
- * Custom Hook สำหรับดึงข้อมูล PM2.5 ของทุกสถานที่
- */
 const useSensorData = () => {
   const [sensorData, setSensorData]     = useState({});
   const [errorSensors, setErrorSensors] = useState({});
@@ -12,7 +9,18 @@ const useSensorData = () => {
   const [loading, setLoading]           = useState(true);
   const [fetchError, setFetchError]     = useState(false);
 
+  const abortControllerRef = useRef(null);
+
   const refresh = useCallback(async () => {
+    // 1. ถ้าระบบกำลังดึงข้อมูลอยู่ แล้วมีคำสั่งใหม่เข้ามา (เช่น รีเฟรชรัวๆ) ให้ยกเลิกอันเก่าทันที
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // สร้าง Controller ประจำรอบนี้โดยเฉพาะ
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     setFetchError(false);
 
@@ -20,22 +28,24 @@ const useSensorData = () => {
     const newErrors   = {};
     let anySuccess    = false;
 
-    // สร้างอาร์เรย์ของ Promise สำหรับดึงข้อมูลพร้อมกัน (Parallel Fetching)
     const fetchPromises = LOCATIONS.map(async (loc) => {
       if (!loc.gid) return null;
       try {
-        const pm25 = await fetchPM25(loc.gid, loc.sensorId);
+        const pm25 = await fetchPM25(loc.gid, loc.sensorId, controller.signal);
         return { sensorId: loc.sensorId, pm25, error: false };
       } catch (err) {
+        if (err.name === 'AbortError') return null; // ข้ามการแจ้ง Error ถ้าจงใจยกเลิก
         console.error(`[${loc.sensorId}]`, err.message);
         return { sensorId: loc.sensorId, pm25: null, error: true };
       }
     });
 
-    // รอให้ทุก Promise ทำงานเสร็จสิ้น ไม่ว่าจะสำเร็จหรือล้มเหลว
     const results = await Promise.all(fetchPromises);
 
-    // จัดการข้อมูลที่ได้กลับมา
+    // 2. *** แก้ปัญหา ***
+    // ถ้ารอบนี้ถูกยกเลิกไปแล้ว (เพราะเปลี่ยนหน้า หรือมีคำสั่งใหม่มาแทน) ให้หยุดเลย ไม่ต้องไปยุ่งกับ State
+    if (controller.signal.aborted) return;
+
     results.forEach((result) => {
       if (result) {
         if (result.error) {
@@ -47,9 +57,14 @@ const useSensorData = () => {
       }
     });
 
+    // อัปเดตข้อมูลเซนเซอร์
     setSensorData((prev) => ({ ...prev, ...newReadings }));
     setErrorSensors(newErrors);
-    if (!anySuccess) setFetchError(true);
+
+    // ถ้าไม่มีข้อมูลไหนสำเร็จเลย ให้แสดง Error
+    setFetchError(!anySuccess);
+
+    // อัปเดตเวลาเสมอ เพื่อให้รู้ว่าระบบยังพยายามดึงข้อมูลอยู่
     setLastUpdate(new Date().toLocaleString('th-TH'));
     setLoading(false);
   }, []);
@@ -57,7 +72,13 @@ const useSensorData = () => {
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, FETCH_INTERVAL_MS);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [refresh]);
 
   return { sensorData, errorSensors, lastUpdate, loading, fetchError, refresh };

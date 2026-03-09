@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { getAQIInfo } from '../utils/aqi';
 import useCountUp from '../hooks/useCountUp';
 import { IconMapPin, IconAlertCircle } from './Icons';
@@ -7,6 +8,8 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
   const displayPm25 = useCountUp(safePm25);
   const aqiInfo = getAQIInfo(pm25);
   const isUnknown = pm25 === null || pm25 === undefined || hasError;
+
+  const [imgSrc, setImgSrc] = useState(data.image);
 
   return (
       <div
@@ -24,8 +27,8 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
         {/* container ของภาพยังคง overflow-hidden */}
         <div className="relative h-48 md:h-56 overflow-hidden">
           <img
-              src={data.image}
-              onError={(e) => { e.target.onerror = null; e.target.src = data.fallback; }}
+              src={imgSrc} // เปลี่ยนมาใช้ State imgSrc แทน
+              onError={() => setImgSrc(data.fallback)} // เปลี่ยนมาใช้ setImgSrc เมื่อรูปโหลดไม่ขึ้น
               alt={data.name}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" // scale ภาพ 110%
           />
