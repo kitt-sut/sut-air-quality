@@ -24,4 +24,4 @@ export const LOCATIONS = [
   },
 ];
 
-export const FETCH_INTERVAL_MS = 60_000; // 1 minute
+export const FETCH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes

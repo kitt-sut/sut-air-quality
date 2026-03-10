@@ -3,11 +3,26 @@ import { getAQIInfo } from '../utils/aqi';
 import useCountUp from '../hooks/useCountUp';
 import { IconMapPin, IconAlertCircle } from './Icons';
 
+/**
+ * สถานะของการ์ดมี 3 แบบเท่านั้น (state machine) เพื่อป้องกัน logic ซ้อนทับกัน:
+ *  'loading' — กำลังโหลดครั้งแรก (ยังไม่มีข้อมูลเลย)
+ *  'error'   — โหลดแล้วแต่ไม่มีข้อมูลที่ใช้งานได้
+ *  'data'    — มีข้อมูล PM2.5 ที่ถูกต้อง
+ */
+const resolveCardState = (loading, pm25, hasError) => {
+  const hasValidData = typeof pm25 === 'number' && !isNaN(pm25) && pm25 >= 0 && !hasError;
+  if (hasValidData)           return 'data';
+  if (loading && !hasValidData) return 'loading';
+  return 'error';
+};
+
 const LocationCard = ({ data, pm25, loading, hasError }) => {
-  const safePm25 = pm25 !== null && pm25 !== undefined && !isNaN(pm25) ? pm25 : 0;
+  const cardState = resolveCardState(loading, pm25, hasError);
+  const aqiInfo   = getAQIInfo(pm25); // จะเป็น null ถ้า pm25 ไม่ valid
+
+  // useCountUp รับค่า pm25 ที่ผ่านการตรวจสอบแล้วเสมอ ตรงกับ aqiInfo
+  const safePm25    = cardState === 'data' ? pm25 : 0;
   const displayPm25 = useCountUp(safePm25);
-  const aqiInfo = getAQIInfo(pm25);
-  const isUnknown = pm25 === null || pm25 === undefined || hasError;
 
   const [imgSrc, setImgSrc] = useState(data.image);
 
@@ -17,26 +32,23 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
                  hover:shadow-2xl transition-all duration-500 border border-gray-100
                  h-full flex flex-col"
       >
-        {/* ── 1. Top Border Overlay ── (เพิ่มส่วนนี้มาใหม่และซ้อนอยู่ด้านบนสุด) */}
+        {/* ── Top Border ── */}
         <div
-            className="absolute top-0 left-0 right-0 h-1 z-30" // ใช้ h-1 สำหรับความหนา 4px และ z-30 เพื่อให้อยู่ด้านบนสุด
+            className="absolute top-0 left-0 right-0 h-1 z-30"
             style={{ backgroundColor: aqiInfo ? aqiInfo.color : '#d1d5db' }}
         />
 
         {/* ── Image ── */}
-        {/* container ของภาพยังคง overflow-hidden */}
         <div className="relative h-48 md:h-56 overflow-hidden">
           <img
-              src={imgSrc} // เปลี่ยนมาใช้ State imgSrc แทน
-              onError={() => setImgSrc(data.fallback)} // เปลี่ยนมาใช้ setImgSrc เมื่อรูปโหลดไม่ขึ้น
+              src={imgSrc}
+              onError={() => setImgSrc(data.fallback)}
               alt={data.name}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" // scale ภาพ 110%
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
-          {/* เพิ่ม z-10 เพื่อให้อยู่เหนือภาพ แต่ใต้ Label/Badge */}
           <div className="absolute inset-0 bg-gradient-to-t from-white via-white/10 to-black/30 z-10" />
 
           {/* Location label */}
-          {/* เพิ่ม z-20 เพื่อให้อยู่เหนือ gradient และภาพ */}
           <div className="absolute bottom-4 left-4 right-4 z-20">
             <div className="inline-flex items-center gap-2 bg-white/90 backdrop-blur-sm
                           px-4 py-2 rounded-xl shadow-sm max-w-full">
@@ -46,7 +58,6 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
           </div>
 
           {/* Sensor ID badge */}
-          {/* เพิ่ม z-20 เพื่อให้อยู่เหนือ gradient และภาพ */}
           <div className="absolute top-4 right-4 z-20">
           <span className="text-[10px] font-mono bg-black/50 text-white px-2 py-1
                            rounded backdrop-blur-md">
@@ -58,16 +69,16 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
         {/* ── Content ── */}
         <div className="relative flex-1 p-6 flex flex-col items-center justify-center bg-white rounded-t-[2rem] -mt-6">
 
-          {/* Loading skeleton */}
-          {loading && !aqiInfo && (
+          {/* ── State: loading ── */}
+          {cardState === 'loading' && (
               <div className="flex flex-col items-center gap-3 py-6">
                 <div className="w-44 h-44 rounded-full border-8 border-gray-100 animate-pulse bg-gray-50" />
                 <div className="w-24 h-4 bg-gray-100 rounded-full animate-pulse" />
               </div>
           )}
 
-          {/* Error state */}
-          {!loading && isUnknown && (
+          {/* ── State: error ── */}
+          {cardState === 'error' && (
               <div className="flex flex-col items-center gap-3 py-6 text-center">
                 <div className="w-44 h-44 rounded-full border-8 border-gray-200
                             flex flex-col items-center justify-center bg-gray-50">
@@ -81,8 +92,8 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
               </div>
           )}
 
-          {/* Data display */}
-          {aqiInfo && !isUnknown && (
+          {/* ── State: data ── */}
+          {cardState === 'data' && aqiInfo && (
               <>
                 <div className="relative mb-5 mt-2">
                   {/* Glow */}
@@ -101,7 +112,7 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
                     className="text-6xl font-black tracking-tighter leading-none transition-colors duration-500"
                     style={{ color: aqiInfo.textColor }}
                 >
-                  {loading ? '…' : displayPm25}
+                  {displayPm25}
                 </span>
                     <span className="text-gray-400 text-xs font-medium mt-0.5">µg/m³</span>
                     <span className="text-3xl mt-1.5 transition-transform group-hover:scale-110 drop-shadow-sm">
