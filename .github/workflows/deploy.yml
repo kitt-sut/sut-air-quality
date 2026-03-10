@@ -25,7 +25,13 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - run: npm run build
+
+      # แก้ไขจุดนี้: เพิ่ม env เพื่อดึงค่าจาก Repository Variables มาใช้ตอน Build
+      - name: Build with Environment Variables
+        env:
+          VITE_GOOGLE_SHEET_ID: ${{ vars.VITE_GOOGLE_SHEET_ID }}
+        run: npm run build
+
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
