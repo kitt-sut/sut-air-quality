@@ -10,6 +10,7 @@ const useSensorData = () => {
   const [fetchError, setFetchError]     = useState(false);
 
   const abortControllerRef = useRef(null);
+  const timeoutRef         = useRef(null); // ใช้ setTimeout แทน setInterval
 
   const refresh = useCallback(async () => {
     // 1. ถ้าระบบกำลังดึงข้อมูลอยู่ แล้วมีคำสั่งใหม่เข้ามา (เช่น รีเฟรชรัวๆ) ให้ยกเลิกอันเก่าทันที
@@ -70,11 +71,20 @@ const useSensorData = () => {
   }, []);
 
   useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, FETCH_INTERVAL_MS);
+    // นัดหมาย fetch รอบถัดไปหลังจาก fetch รอบปัจจุบันเสร็จสมบูรณ์แล้วเท่านั้น
+    // ป้องกัน fetch ซ้อนกันในกรณีที่ network ช้ากว่า FETCH_INTERVAL_MS
+    const schedule = () => {
+      timeoutRef.current = setTimeout(async () => {
+        await refresh();
+        schedule(); // นัดหมายรอบต่อไปหลัง fetch เสร็จ ไม่ใช่ตามเวลานาฬิกา
+      }, FETCH_INTERVAL_MS);
+    };
+
+    // fetch ครั้งแรกทันที แล้วค่อยเริ่ม schedule
+    refresh().then(schedule);
 
     return () => {
-      clearInterval(interval);
+      clearTimeout(timeoutRef.current);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }

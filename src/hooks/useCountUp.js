@@ -7,8 +7,9 @@ import { useState, useEffect, useRef } from 'react';
  */
 const useCountUp = (end, duration = 1500) => {
   const [count, setCount] = useState(end);
-  const prevRef = useRef(end);   // เก็บค่าก่อนหน้า เพื่อเริ่ม animate จากตรงนั้น
-  const rafRef  = useRef(null);
+  const prevRef    = useRef(end);  // เก็บค่าก่อนหน้า เพื่อเริ่ม animate จากตรงนั้น
+  const rafRef     = useRef(null);
+  const currentRef = useRef(end);  // track ค่าที่แสดงอยู่จริงๆ ณ ขณะนั้น
 
   useEffect(() => {
     const startVal = prevRef.current;
@@ -27,7 +28,9 @@ const useCountUp = (end, duration = 1500) => {
       // easeOutCubic — ทำให้การเคลื่อนไหวดูเป็นธรรมชาติมากขึ้น
       const eased = 1 - Math.pow(1 - progress, 3);
 
-      setCount(Math.round(startVal + diff * eased));
+      const next = Math.round(startVal + diff * eased);
+      currentRef.current = next; // อัปเดตทุก frame เพื่อให้ cleanup รู้ว่าหยุดอยู่ที่เท่าไหร่
+      setCount(next);
 
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(animate);
@@ -40,8 +43,8 @@ const useCountUp = (end, duration = 1500) => {
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      // บันทึกค่า ณ จุดที่ยกเลิก เพื่อให้รอบหน้า animate ต่อจากตรงนี้ได้อย่างราบรื่น
-      prevRef.current = end;
+      // บันทึกค่า ณ จุดที่ยกเลิกจริงๆ (ไม่ใช่ end) เพื่อให้รอบหน้า animate ต่อจากตรงนี้ได้อย่างราบรื่น
+      prevRef.current = currentRef.current;
     };
   }, [end, duration]);
 

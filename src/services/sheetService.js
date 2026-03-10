@@ -1,5 +1,15 @@
 import { SHEET_ID, PM25_COL_INDEX } from '../config';
 
+// ── Validate ก่อนสร้าง URL ──────────────────────────────────────────────────
+// ทำที่ module level เพื่อให้ fail เร็วที่สุด (ตอน app เริ่มต้น)
+// ไม่ใช่ตอน user รอผลข้อมูลอยู่
+if (!SHEET_ID) {
+  throw new Error(
+      '[sheetService] VITE_GOOGLE_SHEET_ID is not set.\n' +
+      'Please create a .env file and add: VITE_GOOGLE_SHEET_ID=<your_sheet_id>'
+  );
+}
+
 // สร้าง base URL ครั้งเดียวตอน module โหลด ไม่สร้างซ้ำทุก call
 const SHEET_BASE_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq`;
 
@@ -24,17 +34,16 @@ export const fetchPM25 = async (gid, sensorId, signal) => {
 
   const text = await response.text();
 
-  const jsonString = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+  const match = text.match(/google\.visualization\.Query\.setResponse\((\{[\s\S]*})\s*\)/);
+  if (!match) {
+    throw new Error(`Unexpected response format for ${sensorId}`);
+  }
 
   let data;
   try {
-    data = JSON.parse(jsonString);
+    data = JSON.parse(match[1]);
   } catch (err) {
     throw new Error(`Invalid JSON format for ${sensorId}: ${err.message}`);
-  }
-
-  if (!data || !data.table || !data.table.rows || data.table.rows.length === 0) {
-    throw new Error(`Sheet is empty or no valid rows for ${sensorId}`);
   }
 
   const row = data.table.rows[0];

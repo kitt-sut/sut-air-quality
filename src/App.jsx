@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { LOCATIONS } from './config';
+import { LOCATIONS, FETCH_INTERVAL_MS } from './config';
 import useSensorData from './hooks/useSensorData';
 import LocationCard from './components/LocationCard';
 import AQILegend from './components/AQILegend';
 import { IconCloudFog, IconRefresh, IconExternalLink, IconInfo, IconAlertCircle } from './components/Icons';
+
+const FETCH_INTERVAL_MIN = Math.round(FETCH_INTERVAL_MS / 60_000);
 
 function App() {
   const [loaded, setLoaded] = useState(false);
@@ -73,7 +75,7 @@ function App() {
                           flex items-center gap-3 text-sm text-red-600">
             <IconAlertCircle className="w-5 h-5 flex-shrink-0" />
             <span className="flex-1">
-              ไม่สามารถเชื่อมต่อกับเซนเซอร์ได้ในขณะนี้ ระบบจะลองใหม่อีกครั้งใน 1 นาที
+              ไม่สามารถเชื่อมต่อกับเซนเซอร์ได้ในขณะนี้ ระบบจะลองใหม่อีกครั้งใน {FETCH_INTERVAL_MIN} นาที
             </span>
             <button
               onClick={refresh}

@@ -24,7 +24,8 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
   const safePm25    = cardState === 'data' ? pm25 : 0;
   const displayPm25 = useCountUp(safePm25);
 
-  const [imgSrc, setImgSrc] = useState(data.image);
+  const [imgSrc, setImgSrc]         = useState(data.image);
+  const [imgFailed, setImgFailed]   = useState(false);
 
   return (
       <div
@@ -42,7 +43,16 @@ const LocationCard = ({ data, pm25, loading, hasError }) => {
         <div className="relative h-48 md:h-56 overflow-hidden">
           <img
               src={imgSrc}
-              onError={() => setImgSrc(data.fallback)}
+              onError={() => {
+                if (!imgFailed && imgSrc !== data.fallback) {
+                  // รอบแรก: ลอง fallback URL
+                  setImgFailed(true);
+                  setImgSrc(data.fallback);
+                } else {
+                  // รอบสอง: fallback ก็ fail → ซ่อน img ไม่ให้ loop ต่อ
+                  e.currentTarget.style.display = 'none';
+                }
+              }}
               alt={data.name}
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
